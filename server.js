@@ -3,7 +3,6 @@ const express = require("express");
 const connectToDB = require("./database/db");
 
 const app = express();
-connectToDB();
 
 app.use(express.json());
 
@@ -15,7 +14,7 @@ app.get("/", (req, res) => {
   });
 });
 
-app.listen(
-  PORT,
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`)
-);
+app.listen(PORT, async () => {
+  await connectToDB();
+  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+});
