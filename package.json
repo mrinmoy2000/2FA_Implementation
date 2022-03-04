@@ -38,5 +38,8 @@
   },
   "prettier": {
     "tabwidth": 4
+  },
+  "engines": {
+    "node": ">=14.13.0"
   }
 }
