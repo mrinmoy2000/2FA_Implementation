@@ -56,6 +56,31 @@ exports.generate2FACode = async (req, res, next) => {
   returnQRCode(otpauthUrl, res);
 };
 
+exports.verify2FACode = async (req, res, next) => {
+  const { token } = req.body;
+  const cookieToken = req.cookies.facade;
+  const decoded = jwt.verify(cookieToken, process.env.JWT_SECRET_KEY);
+  const user = await User.findById(decoded.id);
+
+  const verified = speakEasy.totp.verify({
+    secret: user.twoFactorAuthCode,
+    encoding: "base32",
+    token
+  })
+
+  if(verified){
+    await User.findOneAndUpdate(decoded.id, {
+      twoFactorAuthEnabled: true
+    })
+    cookieTokenResponse(user, 200, res);
+  }
+  else{
+    res.json({
+      verified: false
+    })
+  }
+}
+
 exports.registerUser = asyncManager(async (req, res) => {
   const { name, email, password, confirmPassword } = req.body;
 
@@ -89,6 +114,15 @@ exports.loginUser = asyncManager(async (req, res, next) => {
 
   if (!isMatching) {
     return next(new TwoFactorError("Please enter valid password.", 400));
+  }
+
+  if(user.twoFactorAuthEnabled){
+    res.send({
+      twoFactorAuthEnabled: true
+    })
+  }
+  else{
+    cookieTokenResponse(user, 200, res);
   }
 
   cookieTokenResponse(user, 200, res);
