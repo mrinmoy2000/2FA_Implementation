@@ -65,21 +65,20 @@ exports.verify2FACode = async (req, res, next) => {
   const verified = speakEasy.totp.verify({
     secret: user.twoFactorAuthCode,
     encoding: "base32",
-    token
-  })
+    token,
+  });
 
-  if(verified){
+  if (verified) {
     await User.findOneAndUpdate(decoded.id, {
-      twoFactorAuthEnabled: true
-    })
+      twoFactorAuthEnabled: true,
+    });
     cookieTokenResponse(user, 200, res);
-  }
-  else{
+  } else {
     res.json({
-      verified: false
-    })
+      verified: false,
+    });
   }
-}
+};
 
 exports.registerUser = asyncManager(async (req, res) => {
   const { name, email, password, confirmPassword } = req.body;
@@ -116,16 +115,25 @@ exports.loginUser = asyncManager(async (req, res, next) => {
     return next(new TwoFactorError("Please enter valid password.", 400));
   }
 
-  if(user.twoFactorAuthEnabled){
-    res.send({
-      twoFactorAuthEnabled: true
-    })
-  }
-  else{
+  if (user.twoFactorAuthEnabled) {
+    const token = user.signJwtToken();
+
+    const cookieOptions = {
+      expires: new Date(
+        Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
+      ),
+      httpOnly: true,
+    };
+
+    if (process.env.NODE_ENV === "production") {
+      cookieOptions.secure = true;
+    }
+    res.cookie("facade", token, cookieOptions).json({
+      twoFactorAuthEnabled: true,
+    });
+  } else {
     cookieTokenResponse(user, 200, res);
   }
-
-  cookieTokenResponse(user, 200, res);
 });
 
 exports.logoutUser = asyncManager(async (req, res, next) => {
