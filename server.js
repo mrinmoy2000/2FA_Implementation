@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const connectToDB = require("./database/db");
+const ErrorsMiddleWare = require("./middleware/mongoErrorHandler")
 
 process.on("uncaughtException", () => {
   console.log("Stopping server due to UnCaught Exception");
@@ -19,6 +20,9 @@ app.get("/", (req, res) => {
     h1: "Welcome to the NodeJs 2FA App",
   });
 });
+
+//Errors MiddleWare
+app.use(ErrorsMiddleWare);
 
 const server = app.listen(PORT, async () => {
   await connectToDB();
