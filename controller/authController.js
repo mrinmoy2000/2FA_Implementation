@@ -1,5 +1,9 @@
 const User = require("../models/User");
+const speakEasy = require("speakeasy");
+const qrCode = require("qrcode");
+const jwt = require("jsonwebtoken");
 const asyncManager = require("../utils/asyncManager");
+const TwoFactorError = require("../utils/twoFactorError");
 
 const cookieTokenResponse = (user, statusCode, res) => {
   const token = user.signJwtToken();
@@ -16,6 +20,7 @@ const cookieTokenResponse = (user, statusCode, res) => {
   }
 
   user.password = undefined;
+  user.twoFactorAuthEnabled = undefined;
 
   res.status(statusCode).cookie("facade", token, cookieOptions).json({
     success: true,
@@ -24,6 +29,31 @@ const cookieTokenResponse = (user, statusCode, res) => {
       user,
     },
   });
+};
+
+// 2 factor authentication setup
+const generateSpeakEasySecretCode = () => {
+  const secretCode = speakEasy.generateSecret({
+    name: process.env.TWO_FACTOR_APP_NAME,
+  });
+  return {
+    otpauthUrl: secretCode.otpauth_url,
+    base32: secretCode.base32,
+  };
+};
+
+const returnQRCode = (data, res) => {
+  qrCode.toFileStream(res, data);
+};
+
+exports.generate2FACode = async (req, res, next) => {
+  const token = req.cookies.facade;
+  const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+  const { otpauthUrl, base32 } = generateSpeakEasySecretCode();
+  await User.findOneAndUpdate(decoded.id, {
+    twoFactorAuthCode: base32,
+  });
+  returnQRCode(otpauthUrl, res);
 };
 
 exports.registerUser = asyncManager(async (req, res) => {
@@ -37,4 +67,41 @@ exports.registerUser = asyncManager(async (req, res) => {
   });
 
   cookieTokenResponse(newUser, 200, res);
+});
+
+exports.loginUser = asyncManager(async (req, res, next) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return next(
+      new TwoFactorError("Please enter both email and password.", 400)
+    );
+  }
+
+  const user = await User.findOne({ email: email }).select("+password");
+  if (!user) {
+    return next(
+      new TwoFactorError("Please enter valid email and password.", 401)
+    );
+  }
+
+  const isMatching = await user.comparePasswords(password);
+
+  if (!isMatching) {
+    return next(new TwoFactorError("Please enter valid password.", 400));
+  }
+
+  cookieTokenResponse(user, 200, res);
+});
+
+exports.logoutUser = asyncManager(async (req, res, next) => {
+  res.cookie("facade", "loggedout", {
+    expires: new Date(Date.now() + 10 * 1000),
+    httpOnly: true,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Logged out successfully.",
+  });
 });

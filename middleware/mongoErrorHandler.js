@@ -24,7 +24,7 @@ const mongooseErrorHandler = (err, req, res, next) => {
   return res.status(error.statusCode || 500).json({
     success: false,
     error,
-    message: error.message,
+    message: error.stack,
   });
 };
 

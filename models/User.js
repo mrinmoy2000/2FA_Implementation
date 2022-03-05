@@ -34,6 +34,10 @@ const UserSchema = new mongoose.Schema({
       message: "Entered passwords do not match.",
     },
   },
+  twoFactorAuthCode: String,
+  twoFactorAuthEnabled: {
+    type: Boolean,
+  },
 });
 
 //Hash the password if modifed
