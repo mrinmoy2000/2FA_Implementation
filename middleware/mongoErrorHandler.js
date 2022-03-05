@@ -17,7 +17,7 @@ const mongooseErrorHandler = (err, req, res, next) => {
 
   if (err.name === "ValidationError") {
     const errors = Object.values(err.errors).map((val) => val.message);
-    const message = `Invalid input data. ${errors.join(". ")}`;
+    const message = `Invalid input data. ${errors.join(" ")}`;
     error = new TwoFactorError(message, 400);
   }
 
